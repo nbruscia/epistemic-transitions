@@ -1,0 +1,33 @@
+.graphviz-layer {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: #f7f7f3;
+  color: #6b7a7b;
+  font-size: 12px;
+}
+.graphviz-layer[hidden] { display: none; }
+.graphviz-layer svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  flex: 1 1 auto;
+}
+.graphviz-layer g.node:focus { outline: none; }
+.graphviz-layer g.node.selected polygon,
+.graphviz-layer g.node.selected path,
+.graphviz-layer g.node.selected ellipse {
+  stroke: #d78b3e;
+  stroke-width: 3px;
+  stroke-opacity: 1;
+}
+@media(max-width:680px) {
+  .graphviz-layer { padding: 8px; }
+  .toolbar .toggle { flex-wrap: wrap; }
+}
