@@ -25,6 +25,11 @@
         .on('tick',()=>this.tick());
       this.zoom=d3.zoom().scaleExtent([.35,3.4]).on('zoom',event=>this.viewport.attr('transform',event.transform));
       this.svg.call(this.zoom).on('dblclick.zoom',null);
+      // A click anywhere outside a node clears the focus, restoring the
+      // original network contrast. Node clicks retain their own selection.
+      this.svg.on('click.clear-selection',event=>{
+        if(!event.target.closest('g.node'))this.onSelect(null);
+      });
       this.resizeObserver=new ResizeObserver(()=>this.resize());
       this.resizeObserver.observe(svgElement);
       this.resize();
