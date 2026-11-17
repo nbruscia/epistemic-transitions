@@ -3,7 +3,7 @@
 (function () {
   if (!window.d3) return;
   const d3 = window.d3;
-  const palette = {transformation:'#466c79',condition:'#b9874b',implication:'#8188a8',response:'#528d73'};
+  const palette = {transformation:'#202020',condition:'#ffffff',implication:'#ffffff',response:'#d1d1d1'};
 
   class EpistemicD3 {
     constructor(svgElement, onSelect) {
@@ -19,7 +19,7 @@
       this.simulation=d3.forceSimulation([])
         .force('link',d3.forceLink([]).id(d=>d.id).distance(d=>d.source.type==='transformation'?135:165).strength(.35))
         .force('charge',d3.forceManyBody().strength(d=>d.type==='transformation'?-490:-270))
-        .force('collision',d3.forceCollide().radius(d=>d.type==='transformation'?50:39).iterations(2))
+        .force('collision',d3.forceCollide().radius(d=>d.type==='transformation'?56:37).iterations(2))
         .velocityDecay(.42)
         .alphaDecay(.045)
         .on('tick',()=>this.tick());
@@ -68,7 +68,7 @@
 
     update(data, mode, selected) {
       this.selected=selected;
-      this.nodesLayer.selectAll('g.node').classed('selected',d=>d.id===selected);
+      this.applyFocus();
       const edgeKey=e=>`${e.id||''}:${e.from}:${e.to}`;
       const signature=mode+'|'+data.nodes.map(n=>`${n.id}:${n.label}:${n.type}`).join('|')+'|'+data.edges.map(edgeKey).join('|');
       if(signature===this.signature)return;
@@ -111,17 +111,18 @@
         .classed('selected',d=>d.id===selected)
         .classed('root',d=>d.type==='transformation')
         .classed('idea',d=>d.type!=='transformation');
-      nodeSelection.select('.main-circle').attr('r',d=>d.type==='transformation'?35:24)
-        .attr('fill',d=>d.type==='transformation'?palette.transformation:'#fff')
-        .attr('stroke',d=>palette[d.type]);
-      nodeSelection.select('.inner-circle').attr('r',d=>d.type==='transformation'?0:7)
-        .attr('fill',d=>palette[d.type]);
+      nodeSelection.select('.main-circle').attr('r',d=>d.type==='transformation'?42:20)
+        .attr('fill',d=>palette[d.type]).attr('stroke','#202020')
+        .attr('stroke-width',d=>d.type==='transformation'?1.4:1.3)
+        .attr('stroke-dasharray',d=>d.type==='implication'?'3 3':null);
+      nodeSelection.select('.inner-circle').attr('r',d=>d.type==='condition'?4:0)
+        .attr('fill','#202020');
       nodeSelection.select('.node-label').each(function(d){
         const text=d3.select(this);text.selectAll('*').remove();
         if(d.type!=='transformation'){
-          text.attr('y',39).text(d.label.length>25?d.label.slice(0,24)+'…':d.label);return;
+          text.attr('y',34).attr('fill','#202020').text(d.label.length>25?d.label.slice(0,24)+'…':d.label);return;
         }
-        text.text(null);
+        text.attr('fill','#ffffff').text(null);
         const words=d.label.split(' '),lines=[];let current='';
         words.forEach(word=>{if((current+' '+word).trim().length>12&&current){lines.push(current);current=word;}else current=(current+' '+word).trim();});
         if(current)lines.push(current);
@@ -132,7 +133,24 @@
       this.simulation.force('link').links(edges);
       this.installForces();
       this.simulation.alpha(.9).restart();
+      this.applyFocus();
       this.tick();
+    }
+
+    applyFocus(){
+      if(!this.nodeSelection)return;
+      const id=this.selected;
+      const linked=new Set(id?[id]:[]);
+      if(id)for(const edge of this.simulation.force('link').links()){
+        const from=edge.source?.id||edge.source,to=edge.target?.id||edge.target;
+        if(from===id)linked.add(to);
+        if(to===id)linked.add(from);
+      }
+      this.nodeSelection.classed('selected',d=>d.id===id)
+        .classed('focus-dim',d=>Boolean(id)&&!linked.has(d.id));
+      if(this.edgeSelection)this.edgeSelection
+        .classed('focus-linked',d=>Boolean(id)&&((d.source?.id||d.source)===id||(d.target?.id||d.target)===id))
+        .classed('focus-dim',d=>Boolean(id)&&((d.source?.id||d.source)!==id&&(d.target?.id||d.target)!==id));
     }
 
     tick() {
