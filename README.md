@@ -14,7 +14,7 @@ The initial prototype includes:
 
 Open `index.html` locally or host this repository using GitHub Pages.
 
-**Important:** The current version is not a shared live session. Each browser stores its own graph.
+**Local mode:** Contributions remain browser-local. **Shared mode:** Click **Join shared session** to sign in anonymously and synchronize through Firestore. Shared mode requires the Firestore rules to be deployed first.
 
 ## GitHub Pages deployment
 
@@ -27,7 +27,7 @@ In **Settings → Pages**, choose **Deploy from a branch**, branch **main**, fol
 - Anonymous Authentication: enabled by project owner
 - Database rules: `firestore.rules` is a **draft** and has not been deployed.
 
-## Before enabling shared submissions
+## Firestore activation\n\n1. In Firebase Console → Firestore Database → **Rules**, replace the default rules with the reviewed contents of [`firestore.rules`](./firestore.rules).\n2. Use the Rules Playground or emulator to test allowed creates and denied updates/deletes.\n3. Click **Publish** in the Rules editor only after tests pass.\n4. Open the GitHub Pages app in two independent browsers, click **Join shared session**, and enter the same session ID, e.g. `pilot-2026`.\n5. Confirm an entry in browser A appears in browser B.\n\n**Security limitation:** The initial anonymous write model is intended only for a facilitated pilot. Any person who knows the public Firebase project and collection path could anonymously contribute. A session ID is an organizer, not a secret. Enable App Check and stronger server-side session authorization before broad public distribution.\n\n## Before enabling shared submissions
 
 1. Test Firestore rules in the Firebase Rules Playground or emulator.
 2. Confirm that anonymous users can create only valid new contributions, cannot overwrite others' work, and cannot read unrelated collections.
