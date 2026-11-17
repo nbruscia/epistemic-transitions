@@ -97,7 +97,12 @@
           g.call(d3.drag()
             .on('start',(event,d)=>{this.onSelect(d.id);if(!event.active)this.simulation.alphaTarget(.25).restart();d.fx=d.x;d.fy=d.y;})
             .on('drag',(event,d)=>{d.fx=event.x;d.fy=event.y;})
-            .on('end',(event,d)=>{if(!event.active)this.simulation.alphaTarget(0);/* Keep manually placed nodes pinned until reset. */}));
+            .on('end',(event,d)=>{
+              if(!event.active)this.simulation.alphaTarget(0);
+              // Dragging is temporary in the faculty workshop: release the
+              // node back into the force-directed network on pointer-up.
+              d.fx=null;d.fy=null;
+            }));
           return g;
         },update=>update,exit=>exit.remove()
       );
