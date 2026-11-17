@@ -25,17 +25,21 @@ export async function connectWorkshop(workshopId, onData, onError) {
   const nodesRef = collection(db, ...base, 'nodes');
   const edgesRef = collection(db, ...base, 'edges');
   let nodes = [], edges = [], nodesReady = false, edgesReady = false;
-  const deliver = () => { if (nodesReady && edgesReady) onData({nodes, edges}); };
+  let resolveReady, rejectReady;
+  const ready = new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject;});
+  const deliver = () => { if (nodesReady && edgesReady) {onData({nodes, edges});resolveReady();} };
+  const failed = error => {onError(error);rejectReady(error);};
   const unsubs = [
     onSnapshot(nodesRef, snapshot => {
       nodes = snapshot.docs.map(d => ({id:d.id, ...d.data()}));
       nodesReady = true; deliver();
-    }, onError),
+    }, failed),
     onSnapshot(edgesRef, snapshot => {
       edges = snapshot.docs.map(d => ({id:d.id, ...d.data()}));
       edgesReady = true; deliver();
-    }, onError)
+    }, failed)
   ];
+  try { await ready; } catch(error) { unsubs.forEach(fn=>fn()); throw error; }
   return {
     uid,
     workshopId,
