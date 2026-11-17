@@ -61,6 +61,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   flex: 1 1 auto;
 }
 .graphviz-layer g.node:focus { outline: none; }
+.graphviz-layer g.node text {
+  fill: #202020 !important;
+  font-weight: 400 !important;
+}
+.graphviz-layer g.node.transformation text {
+  fill: #fff !important;
+}
 .graphviz-layer g.node,
 .graphviz-layer g.edge { transition: opacity .18s ease; }
 .graphviz-layer g.node.focus-dim { opacity: .55; }
