@@ -22,7 +22,7 @@
   const sessionButton=document.createElement('button');
   sessionButton.className='secondary'; sessionButton.textContent='Join shared session';
   toolbar.prepend(sessionButton);
-  const showStatus=(message,isError=false)=>{status.style.display='block';status.textContent=message;status.style.color=isError?'#a44436':'#577b70';};
+  const showStatus=(message,isError=false)=>{status.style.display='block';status.textContent=(isError?'Error · ':'')+message;status.style.color=isError?'#202020':'#505050';};
   const graphvizRenderer=window.EpistemicGraphviz
     ?new window.EpistemicGraphviz(document.querySelector('.graph-area'),id=>{selected=id;refresh();},err=>showStatus('Graphviz: '+err.message,true))
     :null;
