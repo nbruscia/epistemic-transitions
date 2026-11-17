@@ -103,10 +103,12 @@
         svg.removeAttribute('width');svg.removeAttribute('height');
         svg.setAttribute('role','img');svg.setAttribute('aria-label',engine+' Graphviz layout');
         this.layer.replaceChildren(svg);
+        const typeById=new Map(data.nodes.map(node=>[node.id,node.type]));
         this.layer.querySelectorAll('g.node').forEach(group=>{
           const title=group.querySelector('title');
           const id=title?.textContent;
           if(!id)return;
+          group.classList.add(typeById.get(id)||'condition');
           group.setAttribute('role','button');group.setAttribute('tabindex','0');group.style.cursor='pointer';
           group.addEventListener('click',()=>this.onSelect(id));
           group.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();this.onSelect(id);}});
