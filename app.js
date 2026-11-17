@@ -68,7 +68,14 @@
       if(root){const lines=[];let line='';n.label.split(' ').forEach(word=>{if((line+' '+word).trim().length>12&&line){lines.push(line);line=word;}else line=(line+' '+word).trim();});if(line)lines.push(line);lines.slice(0,3).forEach((s,i)=>group.append(shape('text',{y:(i-(Math.min(3,lines.length)-1)/2)*12+4},s)));}
       else{group.append(shape('circle',{r:7,fill:colors[n.type]}));group.append(shape('text',{y:r+15},n.label.length>25?n.label.slice(0,24)+'…':n.label));}
       group.addEventListener('click',()=>{selected=n.id;refresh();});group.addEventListener('keydown',e=>{if(e.key==='Enter'){selected=n.id;refresh();}});
-      group.addEventListener('pointerdown',e=>{dragging=n.id;svg.setPointerCapture(e.pointerId);});
+      // Select on pointerdown: the SVG is redrawn every frame, so a later
+      // synthetic click can be lost when its original DOM target is replaced.
+      group.addEventListener('pointerdown',e=>{
+        dragging=n.id;
+        svg.setPointerCapture(e.pointerId);
+        selected=n.id;
+        refresh();
+      });
       svg.append(group);
     });
   }
