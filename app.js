@@ -23,6 +23,9 @@
   sessionButton.className='secondary'; sessionButton.textContent='Join shared session';
   toolbar.prepend(sessionButton);
   const showStatus=(message,isError=false)=>{status.style.display='block';status.textContent=message;status.style.color=isError?'#a44436':'#577b70';};
+  const graphvizRenderer=window.EpistemicGraphviz
+    ?new window.EpistemicGraphviz(document.querySelector('.graph-area'),id=>{selected=id;refresh();},err=>showStatus('Graphviz: '+err.message,true))
+    :null;
   const nodeBy=id=>data.nodes.find(n=>n.id===id);
   const saveLocal=()=>localStorage.setItem(storageKey,JSON.stringify(local));
   const nodeValid=n=>n&&typeof n.id==='string'&&typeof n.label==='string'&&colors[n.type];
@@ -61,7 +64,14 @@
     data.nodes.forEach(n=>{const p=positions[n.id];if(n.id===dragging)return;p.vx=(p.vx+(w/2-p.x)*.0007)*.83;p.vy=(p.vy+(h/2-p.y)*.0007)*.83;p.x=Math.max(52,Math.min(w-52,p.x+p.vx));p.y=Math.max(52,Math.min(h-52,p.y+p.vy));});
   }
   function shape(tag,attrs={},text){const element=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))element.setAttribute(k,v);if(text!==undefined)element.textContent=text;return element;}
-  function draw(){if(d3Renderer){d3Renderer.update(data,mode,selected);return;}const{w,h}=measure();svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.replaceChildren();
+  function draw(){
+    if(mode!=='organic'&&graphvizRenderer){
+      svg.style.display='none';d3Renderer?.simulation.stop();graphvizRenderer.show();
+      graphvizRenderer.update(data,mode,selected);return;
+    }
+    graphvizRenderer?.hide();svg.style.display='block';
+    if(d3Renderer){d3Renderer.update(data,'organic',selected);return;}
+    const{w,h}=measure();svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.replaceChildren();
     data.edges.forEach(e=>{const a=positions[e.from],b=positions[e.to];if(a&&b)svg.append(shape('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:'edge'+(e.secondary?' secondary':'')}));});
     data.nodes.forEach(n=>{const p=positions[n.id];if(!p)return;const root=n.type==='transformation',r=root?35:24;
       const group=shape('g',{class:'node '+(root?'root':'idea')+(selected===n.id?' selected':''),transform:`translate(${p.x} ${p.y})`,tabindex:'0',role:'button','aria-label':n.label});
@@ -123,12 +133,26 @@
     if(data.edges.some(e=>(e.from===from&&e.to===to)||(e.from===to&&e.to===from)))return alert('These nodes are already connected.');
     try{if(shared)await shared.addEdge(from,to);else{local.edges.push({from,to,secondary:true});saveLocal();refresh();}}catch(err){alert('Connection was not saved: '+err.message);}
   });
-  for(const m of ['organic','structured'])$(m).addEventListener('click',()=>{mode=m;['organic','structured'].forEach(k=>$(k).classList.toggle('active',k===m));$('view-title').textContent=m==='organic'?'Organic network':'Structured synthesis';refresh();});
+  const modes=[['organic','Organic','Organic network'],['structured','Hierarchy','Hierarchical interpretation'],['radial','Radial','Radial interpretation'],['clustered','Clustered','Clustered interpretation']];
+  const modeMap={organic:'organic',structured:'dot',radial:'twopi',clustered:'sfdp'};
+  const toggle=document.querySelector('.toggle');
+  $('structured').textContent='Hierarchy';
+  for(const id of ['radial','clustered']){
+    const button=document.createElement('button');button.id=id;button.textContent=id==='radial'?'Radial':'Clustered';toggle.append(button);
+  }
+  for(const[id,,title]of modes)$(id).addEventListener('click',()=>{
+    const next=modeMap[id];const wasOrganic=mode==='organic';mode=next;
+    for(const[button]of modes)$(button).classList.toggle('active',button===id);
+    $('view-title').textContent=title;
+    $('reset-view').style.display=next==='organic'?'':'none';
+    if(next==='organic'&&!wasOrganic)d3Renderer?.simulation.alpha(.35).restart();
+    refresh();
+  });
   $('reset-view').onclick=()=>{if(d3Renderer)d3Renderer.reset();else{positions={};initPositions();}};
   const download=(name,content,mime)=>{const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type:mime}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);};
   $('export-json').onclick=()=>download('epistemic-transitions.json',JSON.stringify(data,null,2),'application/json');
   $('export-dot').onclick=()=>{const escape=s=>String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,' ');download('epistemic-transitions.dot',['digraph EpistemicTransitions {','  graph [overlap=false, splines=true];','  node [style=filled, fontname="Helvetica"];',...data.nodes.map(n=>`  "${escape(n.id)}" [label="${escape(n.label)}", fillcolor="${colors[n.type]}", fontcolor="white"];`),...data.edges.map(e=>`  "${escape(e.from)}" -> "${escape(e.to)}";`),'}'].join('\n'),'text/vnd.graphviz');};
-  $('export-svg').onclick=()=>{const copy=svg.cloneNode(true);copy.setAttribute('xmlns',NS);download('epistemic-transitions.svg',new XMLSerializer().serializeToString(copy),'image/svg+xml');};
+  $('export-svg').onclick=()=>{const current=mode!=='organic'?graphvizRenderer?.getSVG():svg;if(!current)return alert('Please wait for the layout to finish.');const copy=current.cloneNode(true);copy.setAttribute('xmlns',NS);download('epistemic-transitions.svg',new XMLSerializer().serializeToString(copy),'image/svg+xml');};
   $('import-json').onclick=()=>shared?alert('Leave the shared session before importing a local graph.'):$('import-file').click();
   $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const p=JSON.parse(await f.text());if(!Array.isArray(p.nodes)||!Array.isArray(p.edges)||!p.nodes.every(nodeValid))throw Error('Invalid graph format');local=p;data=local;selected=null;positions={};saveLocal();refresh();}catch(err){alert(err.message);}e.target.value='';};
   $('restore').onclick=()=>{if(shared)return;if(confirm('Restore the original six transformations?')){local={nodes:[...seed],edges:[]};data=local;positions={};selected=null;saveLocal();refresh();}};
