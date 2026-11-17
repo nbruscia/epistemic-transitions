@@ -16,6 +16,7 @@
   try { local=JSON.parse(localStorage.getItem(storageKey)); } catch {}
   if (!local || !Array.isArray(local.nodes) || !Array.isArray(local.edges)) local={nodes:[...seed],edges:[]};
   let data=local, mode='organic', selected=null, positions={}, dragging=null, shared=null, session='';
+  const d3Renderer=window.EpistemicD3?new window.EpistemicD3(svg,id=>{selected=id;refresh();}):null;
   const status=document.querySelector('header .status');
   const toolbar=document.querySelector('.tools');
   const sessionButton=document.createElement('button');
@@ -60,7 +61,7 @@
     data.nodes.forEach(n=>{const p=positions[n.id];if(n.id===dragging)return;p.vx=(p.vx+(w/2-p.x)*.0007)*.83;p.vy=(p.vy+(h/2-p.y)*.0007)*.83;p.x=Math.max(52,Math.min(w-52,p.x+p.vx));p.y=Math.max(52,Math.min(h-52,p.y+p.vy));});
   }
   function shape(tag,attrs={},text){const element=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))element.setAttribute(k,v);if(text!==undefined)element.textContent=text;return element;}
-  function draw(){const{w,h}=measure();svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.replaceChildren();
+  function draw(){if(d3Renderer){d3Renderer.update(data,mode,selected);return;}const{w,h}=measure();svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.replaceChildren();
     data.edges.forEach(e=>{const a=positions[e.from],b=positions[e.to];if(a&&b)svg.append(shape('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:'edge'+(e.secondary?' secondary':'')}));});
     data.nodes.forEach(n=>{const p=positions[n.id];if(!p)return;const root=n.type==='transformation',r=root?35:24;
       const group=shape('g',{class:'node '+(root?'root':'idea')+(selected===n.id?' selected':''),transform:`translate(${p.x} ${p.y})`,tabindex:'0',role:'button','aria-label':n.label});
@@ -81,7 +82,7 @@
   }
   svg.addEventListener('pointermove',e=>{if(!dragging)return;const rect=svg.getBoundingClientRect(),{w,h}=measure();const p=positions[dragging];if(p){p.x=(e.clientX-rect.left)*w/rect.width;p.y=(e.clientY-rect.top)*h/rect.height;}});
   svg.addEventListener('pointerup',()=>dragging=null);svg.addEventListener('pointercancel',()=>dragging=null);
-  function tick(){layout();draw();requestAnimationFrame(tick);}
+  function tick(){if(d3Renderer)return;layout();draw();requestAnimationFrame(tick);}
 
   const mergeRemote=remote=>{
     const nodes=[...seed,...remote.nodes.filter(n=>nodeValid(n)&&!seed.some(s=>s.id===n.id))];
@@ -123,7 +124,7 @@
     try{if(shared)await shared.addEdge(from,to);else{local.edges.push({from,to,secondary:true});saveLocal();refresh();}}catch(err){alert('Connection was not saved: '+err.message);}
   });
   for(const m of ['organic','structured'])$(m).addEventListener('click',()=>{mode=m;['organic','structured'].forEach(k=>$(k).classList.toggle('active',k===m));$('view-title').textContent=m==='organic'?'Organic network':'Structured synthesis';refresh();});
-  $('reset-view').onclick=()=>{positions={};initPositions();};
+  $('reset-view').onclick=()=>{if(d3Renderer)d3Renderer.reset();else{positions={};initPositions();}};
   const download=(name,content,mime)=>{const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type:mime}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);};
   $('export-json').onclick=()=>download('epistemic-transitions.json',JSON.stringify(data,null,2),'application/json');
   $('export-dot').onclick=()=>{const escape=s=>String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,' ');download('epistemic-transitions.dot',['digraph EpistemicTransitions {','  graph [overlap=false, splines=true];','  node [style=filled, fontname="Helvetica"];',...data.nodes.map(n=>`  "${escape(n.id)}" [label="${escape(n.label)}", fillcolor="${colors[n.type]}", fontcolor="white"];`),...data.edges.map(e=>`  "${escape(e.from)}" -> "${escape(e.to)}";`),'}'].join('\n'),'text/vnd.graphviz');};
