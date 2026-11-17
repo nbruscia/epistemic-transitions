@@ -1,3 +1,44 @@
+/* Unified monochrome UI. Loaded after the prototype's original stylesheet. */
+:root { color: #202020; background: #f2f2f2; }
+body { background: #f2f2f2; color: #202020; }
+header { background: #fff; border-bottom: 1px solid #d3d3d3; }
+.mark { background: #202020; color: #fff; }
+.kicker, .eyebrow { color: #666; }
+.status, .status b { color: #505050; }
+.sidebar { background: #fbfbfb; }
+.sidebar.left { border-right-color: #d4d4d4; }
+.sidebar.right { border-left-color: #d4d4d4; }
+.sidebar h2, .toolbar h2 { color: #202020; }
+.sub, .small-note, .timeline, .metric small { color: #686868; }
+.field label { color: #404040; }
+.field input, .field select, .field textarea {
+  color: #202020;
+  background: #fff;
+  border-color: #c9c9c9;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: #202020;
+  box-shadow: 0 0 0 2px #dfdfdf;
+  outline: 0;
+}
+.primary { background: #202020; color: #fff; }
+.primary:hover { background: #454545; }
+.secondary { color: #202020; border-color: #bfbfbf; background: #fff; }
+.secondary:hover { background: #ededed; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.toggle { background: #e8e8e8; }
+.toggle button { color: #555; }
+.toggle button.active { color: #fff; background: #202020; box-shadow: none; }
+.toolbar { background: #fff; border-bottom-color: #d9d9d9; }
+.legend { border-top-color: #dadada; }
+.metric, .node-card { background: #fff; border-color: #d6d6d6; }
+.node-card { background: #f4f4f4; }
+.node-card p { color: #545454; }
+.pill { color: #202020; background: #e0e0e0; }
+.rule { border-top-color: #dadada; }
+.hint { background: #fffffff0; border-color: #d7d7d7; color: #666; }
+.chip { background: #fff; border-color: #c9c9c9; }
+
 .graphviz-layer {
   position: absolute;
   inset: 0;
