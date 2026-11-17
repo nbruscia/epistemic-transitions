@@ -7,7 +7,7 @@ A faculty workshop tool for mapping emerging directions in architectural educati
 The initial prototype includes:
 - Six provisional transformations.
 - Contributions categorized as conditions, educational implications, responses, or new transformations.
-- Organic network and structured synthesis views.
+- D3-powered organic network (zoom, pan, collision, drag/pin) and structured synthesis view.
 - Connections between ideas.
 - JSON, DOT (Graphviz), and SVG exports.
 - Browser-local persistence.
@@ -38,7 +38,7 @@ In **Settings → Pages**, choose **Deploy from a branch**, branch **main**, fol
 
 ## Next implementation milestones
 
-- Replace the custom force simulation with D3-force, including zoom and drag.
+- Refine D3-force behavior, labeling, and interaction as the network grows.
 - Use Graphviz layout (DOT) in structured mode.
 - Add a Firestore-backed collaboration option with safe session initialization and facilitator controls.
 - Preserve versioned snapshots for workshop analysis.
