@@ -11,6 +11,9 @@
       this.layer=document.createElement('div');
       this.layer.className='graphviz-layer';
       this.layer.hidden=true;
+      this.layer.addEventListener('click',event=>{
+        if(!event.target.closest('g.node'))this.onSelect(null);
+      });
       container.append(this.layer);
       this.graphvizPromise=null;this.lastSignature='';this.currentEngine='dot';this.token=0;
     }
