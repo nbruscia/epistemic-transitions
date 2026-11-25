@@ -1,7 +1,8 @@
 // On-demand Graphviz layouts. Uses a browser-local WebAssembly engine;
 // switching views never changes node or edge records in Firebase.
 (function () {
-  const palette = {transformation:'#202020',condition:'#ffffff',implication:'#ffffff',response:'#d1d1d1'};
+  const palette = {transformation:'#202020',condition:'#ffffff',implication:'#ffffff',response:'#ffffff'};
+  const actionColor='#c21870';
   const engines = new Set(['dot','twopi','sfdp']);
   const quote = value=>'"'+String(value).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\r?\n/g,' ')+'"';
   // Graphviz recognizes a single DOT \n escape as a line break. Keep that
@@ -66,7 +67,7 @@
           `label=${quoteLabel(root?label:'')}`,
           `fillcolor=${quote(palette[node.type]||'#ffffff')}`,
           `fontcolor=${quote(root?'#ffffff':'#202020')}`,
-          `color="#202020"`,
+          `color=${quote(node.type==='response'?actionColor:'#202020')}`,
           `id=${quote('g-'+node.id)}`,
           `width=${root?'1.30':'0.42'}`,
           `height=${root?'1.30':'0.42'}`
@@ -81,8 +82,10 @@
       }
       const ids=new Set(data.nodes.map(n=>n.id));
       for(const edge of data.edges){
-        if(ids.has(edge.from)&&ids.has(edge.to)&&edge.from!==edge.to)
-          lines.push(`${quote(edge.from)} ${connector} ${quote(edge.to)};`);
+        if(ids.has(edge.from)&&ids.has(edge.to)&&edge.from!==edge.to){
+          const action=data.nodes.some(n=>(n.id===edge.from||n.id===edge.to)&&n.type==='response');
+          lines.push(`${quote(edge.from)} ${connector} ${quote(edge.to)}${action?' [color="'+actionColor+'", penwidth="1.7"]':''};`);
+        }
       }
       lines.push('}');
       return lines.join('\n');
@@ -111,7 +114,7 @@
       this.selected=selected;
       this.edges=data.edges;
       this.currentEngine=engine;
-      const signature=engine+'|'+data.nodes.map(n=>n.id+':'+n.label+':'+n.type+':'+n.status).join('|')+'|'+data.edges.map(e=>e.from+'>'+e.to).join('|');
+      const signature=engine+'|'+data.nodes.map(n=>n.id+':'+n.label+':'+n.type+':'+n.status+':'+(n.reinforcements||0)+':'+(n.questions||0)).join('|')+'|'+data.edges.map(e=>e.from+'>'+e.to).join('|');
       if(signature===this.lastSignature){this.select(selected);return;}
       this.lastSignature=signature;
       const token=++this.token;
@@ -143,16 +146,39 @@
         }
         this.layer.replaceChildren(svg);
         const typeById=new Map(data.nodes.map(node=>[node.id,node.type]));
+        const nodeById=new Map(data.nodes.map(node=>[node.id,node]));
         this.layer.querySelectorAll('g.node').forEach(group=>{
           const title=group.querySelector('title');
           const id=title?.textContent;
           if(!id)return;
           group.classList.add(typeById.get(id)||'condition');
           if(typeById.get(id)!=='transformation')group.querySelectorAll('text').forEach(label=>label.setAttribute('dy','5'));
+          const node=nodeById.get(id),shape=group.querySelector('ellipse');
+          if(node&&shape&&(node.reinforcements||node.questions)){
+            const cx=Number(shape.getAttribute('cx')),cy=Number(shape.getAttribute('cy')),
+              rx=Number(shape.getAttribute('rx')),ry=Number(shape.getAttribute('ry'));
+            for(const [kind,count,side] of [['reinforce',node.reinforcements,1],['question',node.questions,-1]]){
+              if(!count)continue;
+              const mark=document.createElementNS('http://www.w3.org/2000/svg','g');
+              mark.setAttribute('class','reaction-marker '+kind);
+              mark.setAttribute('transform',`translate(${cx+side*(rx+5)} ${cy-ry-4})`);
+              const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+              circle.setAttribute('r','9');circle.setAttribute('fill',kind==='reinforce'?'#202020':'#eeeeee');
+              circle.setAttribute('stroke',kind==='reinforce'?'#202020':'#555555');
+              const label=document.createElementNS('http://www.w3.org/2000/svg','text');
+              label.setAttribute('dy','3.5');label.setAttribute('text-anchor','middle');
+              label.setAttribute('fill',kind==='reinforce'?'#fff':'#333');
+              label.setAttribute('font-size','10');label.textContent=kind==='reinforce'?String(count):'?';
+              mark.append(circle,label);group.append(mark);
+            }
+          }
           group.setAttribute('role','button');group.setAttribute('tabindex','0');group.style.cursor='pointer';
           group.addEventListener('click',()=>this.onSelect(id));
           group.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();this.onSelect(id);}});
         });
+        const responseIds=new Set(data.nodes.filter(n=>n.type==='response').map(n=>n.id));
+        const responseEdges=new Set(data.edges.filter(e=>responseIds.has(e.from)||responseIds.has(e.to)).flatMap(e=>[e.from+'->'+e.to,e.from+'--'+e.to]));
+        this.layer.querySelectorAll('g.edge').forEach(group=>group.classList.toggle('response-link',responseEdges.has(group.querySelector('title')?.textContent)));
         this.select(this.selected);
       }catch(error){
         if(token!==this.token)return;
