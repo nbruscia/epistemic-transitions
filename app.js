@@ -66,7 +66,25 @@
   function populate(id) {
     const select=$(id),old=select.value;
     select.replaceChildren();
-    data.nodes.forEach(n=>{const option=document.createElement('option');option.value=n.id;option.textContent=n.label;select.append(option);});
+    const groups=[
+      ['Domains',n=>domainIds.has(n.id)],
+      ['Transitions',n=>!domainIds.has(n.id)&&n.type==='condition'],
+      ['Implications',n=>n.type==='implication'],
+      ['Responses',n=>n.type==='response'],
+      ['Other / Legacy',n=>!domainIds.has(n.id)&&!['condition','implication','response'].includes(n.type)]
+    ];
+    for(const [name,belongs] of groups){
+      const members=data.nodes.filter(belongs);
+      if(!members.length)continue;
+      const section=document.createElement('optgroup');
+      section.label=`${name} (${members.length})`;
+      for(const n of members){
+        const option=document.createElement('option');
+        option.value=n.id;option.textContent=n.label;
+        section.append(option);
+      }
+      select.append(section);
+    }
     if ([...select.options].some(o=>o.value===old)) select.value=old;
     else if(id==='parent'&&inventory.length)select.value=inventory[0].id;
   }
