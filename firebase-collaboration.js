@@ -49,6 +49,7 @@ export async function connectWorkshop(workshopId, onData, onError) {
         label: input.label.slice(0, 100),
         detail: input.detail.slice(0, 2000),
         type: input.type,
+        ...(input.type==='condition'?{status:['observed','emerging','anticipated'].includes(input.status)?input.status:'emerging'}:{}),
         createdBy: uid,
         createdAt: serverTimestamp()
       });
