@@ -50,6 +50,10 @@
           `height=${root?'1.30':'0.42'}`
         ];
         if(!root){attrs.push('fixedsize="true"',`xlabel=${quote(label)}`);}
+        if(node.type==='condition'){
+          if(node.status==='observed')attrs.push('peripheries="2"');
+          if(node.status==='anticipated')attrs.push('style="filled,dashed"');
+        }
         if(node.type==='implication')attrs.push('style="filled,dashed"');
         lines.push(`${quote(node.id)} [${attrs.join(', ')}];`);
       }
@@ -85,7 +89,7 @@
       this.selected=selected;
       this.edges=data.edges;
       this.currentEngine=engine;
-      const signature=engine+'|'+data.nodes.map(n=>n.id+':'+n.label+':'+n.type).join('|')+'|'+data.edges.map(e=>e.from+'>'+e.to).join('|');
+      const signature=engine+'|'+data.nodes.map(n=>n.id+':'+n.label+':'+n.type+':'+n.status).join('|')+'|'+data.edges.map(e=>e.from+'>'+e.to).join('|');
       if(signature===this.lastSignature){this.select(selected);return;}
       this.lastSignature=signature;
       const token=++this.token;
