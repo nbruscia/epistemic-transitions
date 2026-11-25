@@ -222,7 +222,7 @@
     if(data.edges.some(e=>(e.from===from&&e.to===to)||(e.from===to&&e.to===from)))return alert('These nodes are already connected.');
     try{if(shared)await shared.addEdge(from,to);else{local.edges.push({from,to,secondary:true});saveLocal();refresh();}}catch(err){alert('Connection was not saved: '+err.message);}
   });
-  const modes=[['organic','Organic','Organic network'],['structured','Hierarchy','Hierarchical interpretation'],['clustered','Clustered','Clustered interpretation']];
+  const modes=[['organic','Dynamic','Dynamic network'],['structured','Hierarchy','Hierarchical interpretation'],['clustered','Clustered','Clustered interpretation']];
   const modeMap={organic:'organic',structured:'dot',clustered:'sfdp'};
   const toggle=document.querySelector('.toggle');
   const statusLegend=document.createElement('div');statusLegend.className='status-legend';
