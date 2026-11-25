@@ -182,7 +182,7 @@
         this.select(this.selected);
       }catch(error){
         if(token!==this.token)return;
-        this.layer.textContent='Graphviz layout unavailable. Please switch to Organic and retry.';
+        this.layer.textContent='Graphviz layout unavailable. Please switch to Dynamic and retry.';
         this.lastSignature='';this.onError(error);
       }
     }
