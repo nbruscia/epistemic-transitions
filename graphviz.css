@@ -61,7 +61,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   max-height: 100%;
   flex: 1 1 auto;
 }
-.graphviz-layer g.node:focus { outline: none; }
+.graphviz-layer g.node:focus,
+.d3-viewport g.node:focus { outline: none !important; }
+.graphviz-layer g.node:focus-visible,
+.d3-viewport g.node:focus-visible {
+  outline: 1px solid #a6a6a6 !important;
+  outline-offset: 10px;
+}
 .graphviz-layer g.node text {
   fill: #202020 !important;
   font-weight: 400 !important;
