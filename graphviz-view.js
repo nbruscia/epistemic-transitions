@@ -4,6 +4,19 @@
   const palette = {transformation:'#202020',condition:'#ffffff',implication:'#ffffff',response:'#d1d1d1'};
   const engines = new Set(['dot','twopi','sfdp']);
   const quote = value=>'"'+String(value).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\r?\n/g,' ')+'"';
+  // Graphviz recognizes a single DOT \n escape as a line break. Keep that
+  // escape intact for labels while escaping user-entered backslashes safely.
+  const quoteLabel = value=>'"'+String(value).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\r?\n/g,'\\n')+'"';
+  const wrapLabel=(value,max)=>{
+    const words=String(value||'').trim().split(/\s+/).filter(Boolean);
+    const lines=[];let line='';
+    for(const word of words){
+      if(line&&(`${line} ${word}`).length>max){lines.push(line);line=word;}
+      else line=line?`${line} ${word}`:word;
+    }
+    if(line)lines.push(line);
+    return lines.join('\n');
+  };
 
   class EpistemicGraphviz {
     constructor(container,onSelect,onError) {
@@ -48,9 +61,9 @@
       if(engine==='sfdp')lines.push('graph [K="1.1", repulsiveforce="1.5", overlap="prism"];');
       for(const node of data.nodes){
         const root=node.type==='transformation';
-        const label=String(node.label||'').trim().replace(/(.{16})\s+/g,'$1\\n');
+        const label=wrapLabel(node.label,root?14:26);
         const attrs=[
-          `label=${quote(root?label:'')}`,
+          `label=${quoteLabel(root?label:'')}`,
           `fillcolor=${quote(palette[node.type]||'#ffffff')}`,
           `fontcolor=${quote(root?'#ffffff':'#202020')}`,
           `color="#202020"`,
@@ -58,7 +71,7 @@
           `width=${root?'1.30':'0.42'}`,
           `height=${root?'1.30':'0.42'}`
         ];
-        if(!root){attrs.push('fixedsize="true"',`xlabel=${quote(label)}`);}
+        if(!root){attrs.push('fixedsize="true"',`xlabel=${quoteLabel(label)}`);}
         if(node.type==='condition'){
           if(node.status==='observed')attrs.push('peripheries="2"');
           if(node.status==='anticipated')attrs.push('style="filled,dashed"');
