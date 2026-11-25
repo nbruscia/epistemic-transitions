@@ -16,9 +16,18 @@
       });
       container.append(this.layer);
       this.graphvizPromise=null;this.lastSignature='';this.currentEngine='dot';this.token=0;
+      this.zoom=null;this.zoomRoot=null;
     }
     show(){this.layer.hidden=false;}
     hide(){this.layer.hidden=true;this.token++;if(!this.getSVG())this.lastSignature='';}
+    zoomBy(factor){
+      const svg=this.getSVG();
+      if(svg&&this.zoom&&window.d3)window.d3.select(svg).transition().duration(180).call(this.zoom.scaleBy,factor);
+    }
+    resetZoom(){
+      const svg=this.getSVG();
+      if(svg&&this.zoom&&window.d3)window.d3.select(svg).transition().duration(220).call(this.zoom.transform,window.d3.zoomIdentity);
+    }
     async load(){
       if(!this.graphvizPromise){
         this.graphvizPromise=import('https://cdn.jsdelivr.net/npm/@hpcc-js/wasm-graphviz@1.13.0/dist/index.js')
@@ -106,6 +115,19 @@
         svg.querySelectorAll('*').forEach(node=>{for(const attribute of [...node.attributes])if(/^on/i.test(attribute.name))node.removeAttribute(attribute.name);});
         svg.removeAttribute('width');svg.removeAttribute('height');
         svg.setAttribute('role','img');svg.setAttribute('aria-label',engine+' Graphviz layout');
+        // Zoom the outer wrapper, retaining Graphviz's own internal transform.
+        const graph=svg.querySelector('g.graph');
+        if(graph&&window.d3){
+          const wrapper=document.createElementNS('http://www.w3.org/2000/svg','g');
+          wrapper.setAttribute('class','graphviz-zoom-content');
+          graph.parentNode.insertBefore(wrapper,graph);
+          wrapper.appendChild(graph);
+          this.zoomRoot=wrapper;
+          this.zoom=window.d3.zoom().scaleExtent([.45,8]).on('zoom',event=>{
+            if(this.zoomRoot===wrapper)wrapper.setAttribute('transform',event.transform.toString());
+          });
+          window.d3.select(svg).call(this.zoom).on('dblclick.zoom',null);
+        }
         this.layer.replaceChildren(svg);
         const typeById=new Map(data.nodes.map(node=>[node.id,node.type]));
         this.layer.querySelectorAll('g.node').forEach(group=>{
@@ -113,6 +135,7 @@
           const id=title?.textContent;
           if(!id)return;
           group.classList.add(typeById.get(id)||'condition');
+          if(typeById.get(id)!=='transformation')group.querySelectorAll('text').forEach(label=>label.setAttribute('dy','5'));
           group.setAttribute('role','button');group.setAttribute('tabindex','0');group.style.cursor='pointer';
           group.addEventListener('click',()=>this.onSelect(id));
           group.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();this.onSelect(id);}});
