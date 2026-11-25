@@ -127,7 +127,7 @@
       nodeSelection.select('.node-label').each(function(d){
         const text=d3.select(this);text.selectAll('*').remove();
         if(d.type!=='transformation'){
-          text.attr('y',34).attr('fill','#202020').text(d.label.length>29?d.label.slice(0,28)+'…':d.label);return;
+          text.attr('y',40).attr('fill','#202020').text(d.label.length>29?d.label.slice(0,28)+'…':d.label);return;
         }
         text.attr('fill','#ffffff').text(null);
         const words=d.label.split(' '),lines=[];let current='';
