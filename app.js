@@ -23,9 +23,10 @@
   let local;
   try { local=JSON.parse(localStorage.getItem(storageKey)); } catch {}
   if (!local || !Array.isArray(local.nodes) || !Array.isArray(local.edges)) local={nodes:[],edges:[]};
+  if(!Array.isArray(local.interactions))local.interactions=[];
   local.nodes=[...fixedNodes,...local.nodes.filter(n=>!fixedIds.has(n.id))];
   local.edges=[...initialEdges,...local.edges.filter(e=>!initialEdges.some(s=>(s.from===e.from&&s.to===e.to)||(s.from===e.to&&s.to===e.from)))];
-  let data=local, mode='organic', selected=null, positions={}, dragging=null, shared=null, session='';
+  let data=local, interactions=local.interactions, mode='organic', selected=null, positions={}, dragging=null, shared=null, session='';
   let visibility='domains', statusFilter='all';
   const d3Renderer=window.EpistemicD3?new window.EpistemicD3(svg,id=>{selected=id;refresh();}):null;
   const status=document.querySelector('header .status');
@@ -40,6 +41,13 @@
   const nodeBy=id=>data.nodes.find(n=>n.id===id);
   const saveLocal=()=>localStorage.setItem(storageKey,JSON.stringify(local));
   const nodeValid=n=>n&&typeof n.id==='string'&&typeof n.label==='string'&&colors[n.type];
+  const actorKey='epistemic-transitions-local-actor';
+  let actor=localStorage.getItem(actorKey);
+  if(!actor){actor=crypto.randomUUID();localStorage.setItem(actorKey,actor);}
+  const reactionSummary=id=>({
+    reinforcements:interactions.filter(i=>i.nodeId===id&&i.kind==='reinforce').length,
+    questions:interactions.filter(i=>i.nodeId===id&&i.kind==='question').length
+  });
   const statusField=document.createElement('div');statusField.className='field';statusField.hidden=true;
   statusField.innerHTML='<label for="new-status">Transition status (provisional)</label><select id="new-status"><option value="observed">Observed</option><option value="emerging" selected>Emerging</option><option value="anticipated">Anticipated</option></select>';
   $('kind').closest('.field').after(statusField);
@@ -52,7 +60,7 @@
       return true;
     });
     const ids=new Set(nodes.map(n=>n.id));
-    return {nodes,edges:data.edges.filter(e=>ids.has(e.from)&&ids.has(e.to))};
+    return {nodes:nodes.map(n=>({...n,...reactionSummary(n.id)})),edges:data.edges.filter(e=>ids.has(e.from)&&ids.has(e.to))};
   };
 
   function populate(id) {
@@ -74,8 +82,41 @@
     card.append(badge,title,detail);
     if(n?.status){const status=document.createElement('p');status.textContent='Status: '+n.status.charAt(0).toUpperCase()+n.status.slice(1)+' (provisional)';card.append(status);}
     if(n){const related=document.createElement('p');related.textContent='Connected to: '+(data.edges.filter(e=>e.from===n.id||e.to===n.id).map(e=>nodeBy(e.from===n.id?e.to:e.from)?.label).filter(Boolean).join(', ')||'None yet');card.append(related);}
+    if(n){
+      const counts=reactionSummary(n.id);
+      const summary=document.createElement('p');summary.className='reaction-counts';summary.textContent=`${counts.reinforcements} reinforcements · ${counts.questions} questions`;
+      const actions=document.createElement('div');actions.className='reaction-actions';
+      const reinforce=document.createElement('button');reinforce.type='button';reinforce.className='secondary';reinforce.textContent='Reinforce';
+      const question=document.createElement('button');question.type='button';question.className='secondary';question.textContent='Question / Qualify';
+      const ownId=shared?.uid||actor;
+      if(interactions.some(i=>i.nodeId===n.id&&i.kind==='reinforce'&&(i.createdBy===ownId||i.actor===ownId))){reinforce.textContent='Reinforced ✓';reinforce.disabled=true;}
+      if(interactions.some(i=>i.nodeId===n.id&&i.kind==='question'&&(i.createdBy===ownId||i.actor===ownId)))question.textContent='Edit qualification';
+      reinforce.addEventListener('click',()=>recordInteraction('reinforce',n.id));
+      question.addEventListener('click',()=>recordInteraction('question',n.id));
+      actions.append(reinforce,question);card.append(summary,actions);
+      const notes=interactions.filter(i=>i.nodeId===n.id&&i.kind==='question'&&i.note);
+      if(notes.length){const heading=document.createElement('h4');heading.textContent='Questions and qualifications';card.append(heading);for(const entry of notes){const note=document.createElement('p');note.className='question-note';note.textContent=entry.note;card.append(note);}}
+    }
     $('restore').disabled=Boolean(shared);$('clear').disabled=Boolean(shared);
     draw();
+  }
+  async function recordInteraction(kind,nodeId){
+    let note='';
+    if(kind==='question'){
+      const entered=prompt('What is uncertain, contested, or in need of qualification? (Optional)');
+      if(entered===null)return;
+      note=entered.trim().slice(0,1000);
+    }
+    try{
+      if(shared){await shared.addInteraction({kind,nodeId,note});showStatus('● Faculty interaction recorded in '+session+'.');}
+      else{
+        const id=`${actor}:${kind}:${nodeId}`;
+        const previous=local.interactions.findIndex(i=>i.id===id);
+        const record={id,actor,kind,nodeId,note,createdAt:new Date().toISOString()};
+        if(previous>=0)local.interactions[previous]=record;else local.interactions.push(record);
+        interactions=local.interactions;saveLocal();refresh();
+      }
+    }catch(error){alert('Could not record this interaction: '+error.message+'\n\nShared reactions require an additional Firestore security rule.');}
   }
   function measure(){const rect=svg.getBoundingClientRect();return {w:Math.max(340,rect.width),h:Math.max(320,rect.height)};}
   function initPositions(){const{w,h}=measure();data.nodes.forEach((n,i)=>{if(!positions[n.id]){const angle=i*2.39996,r=n.type==='transformation'?Math.min(w,h)*.30:Math.min(w,h)*.17+Math.sqrt(i)*14;positions[n.id]={x:w/2+Math.cos(angle)*r,y:h/2+Math.sin(angle)*r,vx:0,vy:0};}});}
@@ -126,10 +167,10 @@
     const nodes=[...fixedNodes,...remote.nodes.filter(n=>nodeValid(n)&&!fixedIds.has(n.id))];
     const ids=new Set(nodes.map(n=>n.id));
     const edges=[...initialEdges,...remote.edges.filter(e=>ids.has(e.from)&&ids.has(e.to)&&!initialEdges.some(s=>(s.from===e.from&&s.to===e.to)||(s.from===e.to&&s.to===e.from)))];
-    data={nodes,edges};if(selected&&!ids.has(selected))selected=null;refresh();
+    data={nodes,edges};interactions=remote.interactions||[];if(selected&&!ids.has(selected))selected=null;refresh();
   };
   async function join(){
-    if(shared){shared.disconnect();shared=null;data=local;session='';sessionButton.textContent='Join shared session';showStatus('● Browser-local session');refresh();return;}
+    if(shared){shared.disconnect();shared=null;data=local;interactions=local.interactions;session='';sessionButton.textContent='Join shared session';showStatus('● Browser-local session');refresh();return;}
     const entry=prompt('Workshop session ID (3–40 lowercase letters, digits, hyphens):','pilot-2026');
     if(entry===null)return;
     const id=entry.trim().toLowerCase();sessionButton.disabled=true;showStatus('Connecting to Firestore…');
@@ -194,13 +235,13 @@
   });
   $('reset-view').onclick=()=>{if(d3Renderer)d3Renderer.reset();else{positions={};initPositions();}};
   const download=(name,content,mime)=>{const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type:mime}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);};
-  $('export-json').onclick=()=>download('epistemic-transitions.json',JSON.stringify(data,null,2),'application/json');
+  $('export-json').onclick=()=>download('epistemic-transitions.json',JSON.stringify({...data,interactions},null,2),'application/json');
   $('export-dot').onclick=()=>{const escape=s=>String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,' ');download('epistemic-transitions.dot',['digraph EpistemicTransitions {','  graph [overlap=false, splines=true];','  node [style=filled, fontname="Helvetica"];',...data.nodes.map(n=>`  "${escape(n.id)}" [label="${escape(n.label)}", fillcolor="${colors[n.type]}", fontcolor="white"];`),...data.edges.map(e=>`  "${escape(e.from)}" -> "${escape(e.to)}";`),'}'].join('\n'),'text/vnd.graphviz');};
   $('export-svg').onclick=()=>{const current=mode!=='organic'?graphvizRenderer?.getSVG():svg;if(!current)return alert('Please wait for the layout to finish.');const copy=current.cloneNode(true);copy.setAttribute('xmlns',NS);download('epistemic-transitions.svg',new XMLSerializer().serializeToString(copy),'image/svg+xml');};
   $('import-json').onclick=()=>shared?alert('Leave the shared session before importing a local graph.'):$('import-file').click();
-  $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const p=JSON.parse(await f.text());if(!Array.isArray(p.nodes)||!Array.isArray(p.edges)||!p.nodes.every(nodeValid))throw Error('Invalid graph format');local={nodes:[...fixedNodes,...p.nodes.filter(n=>!fixedIds.has(n.id))],edges:[...initialEdges,...p.edges]};data=local;selected=null;positions={};saveLocal();refresh();}catch(err){alert(err.message);}e.target.value='';};
-  $('restore').onclick=()=>{if(shared)return;if(confirm('Restore the six domains and initial transition inventory?')){local={nodes:[...fixedNodes],edges:[...initialEdges]};data=local;positions={};selected=null;saveLocal();refresh();}};
-  $('clear').onclick=()=>{if(shared)return;if(confirm('Remove all contributed nodes and connections? The fixed inventory will remain.')){local={nodes:[...fixedNodes],edges:[...initialEdges]};data=local;positions={};selected=null;saveLocal();refresh();}};
+  $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const p=JSON.parse(await f.text());if(!Array.isArray(p.nodes)||!Array.isArray(p.edges)||!p.nodes.every(nodeValid))throw Error('Invalid graph format');local={nodes:[...fixedNodes,...p.nodes.filter(n=>!fixedIds.has(n.id))],edges:[...initialEdges,...p.edges],interactions:Array.isArray(p.interactions)?p.interactions:[]};data=local;interactions=local.interactions;selected=null;positions={};saveLocal();refresh();}catch(err){alert(err.message);}e.target.value='';};
+  $('restore').onclick=()=>{if(shared)return;if(confirm('Restore the six domains and initial transition inventory?')){local={nodes:[...fixedNodes],edges:[...initialEdges],interactions:[]};data=local;interactions=local.interactions;positions={};selected=null;saveLocal();refresh();}};
+  $('clear').onclick=()=>{if(shared)return;if(confirm('Remove all contributed nodes, connections, and local interactions? The fixed inventory will remain.')){local={nodes:[...fixedNodes],edges:[...initialEdges],interactions:[]};data=local;interactions=local.interactions;positions={};selected=null;saveLocal();refresh();}};
   window.addEventListener('resize',()=>positions={});
   initPositions();refresh();tick();
 })();
