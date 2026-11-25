@@ -8,19 +8,25 @@
     ['t5','Culture & Identity','Architecture as an expression and transmission of cultural knowledge, memory, identity, and situated building traditions.'],
     ['t6','Agency & Practice','The professional, institutional, political, and ethical responsibilities through which architects participate in shaping the built environment.']
   ].map(([id,label,detail])=>({id,label,detail,type:'transformation'}));
+  const inventory=window.EpistemicInventory||[];
+  const fixedNodes=[...seed,...inventory];
+  const initialEdges=inventory.flatMap(n=>n.domains.map(domain=>({from:domain,to:n.id,seeded:true})));
+  const fixedIds=new Set(fixedNodes.map(n=>n.id));
   // Retain the historical internal type for compatibility with existing workshop
   // exports and Firebase records. Only these six IDs are fixed domains.
   const domainIds=new Set(seed.map(n=>n.id));
-  const displayType=n=>n&&domainIds.has(n.id)?'Domain':n?.type==='transformation'?'Legacy transformation':({condition:'Changing condition',implication:'Educational implication',response:'Proposed response'}[n?.type]||'');
+  const displayType=n=>n&&domainIds.has(n.id)?'Domain':n?.type==='transformation'?'Legacy transformation':({condition:'Transition',implication:'Educational implication',response:'Proposed response'}[n?.type]||'');
   const colors = {transformation:'#466c79', condition:'#b9874b', implication:'#8188a8', response:'#528d73'};
   const $ = id => document.getElementById(id);
   const svg = $('graph'), NS='http://www.w3.org/2000/svg';
   const storageKey='epistemic-transitions-local-v2';
   let local;
   try { local=JSON.parse(localStorage.getItem(storageKey)); } catch {}
-  if (!local || !Array.isArray(local.nodes) || !Array.isArray(local.edges)) local={nodes:[...seed],edges:[]};
-  local.nodes=[...seed,...local.nodes.filter(n=>!domainIds.has(n.id))];
+  if (!local || !Array.isArray(local.nodes) || !Array.isArray(local.edges)) local={nodes:[],edges:[]};
+  local.nodes=[...fixedNodes,...local.nodes.filter(n=>!fixedIds.has(n.id))];
+  local.edges=[...initialEdges,...local.edges.filter(e=>!initialEdges.some(s=>(s.from===e.from&&s.to===e.to)||(s.from===e.to&&s.to===e.from)))];
   let data=local, mode='organic', selected=null, positions={}, dragging=null, shared=null, session='';
+  let visibility='domains', statusFilter='all';
   const d3Renderer=window.EpistemicD3?new window.EpistemicD3(svg,id=>{selected=id;refresh();}):null;
   const status=document.querySelector('header .status');
   const toolbar=document.querySelector('.tools');
@@ -34,12 +40,27 @@
   const nodeBy=id=>data.nodes.find(n=>n.id===id);
   const saveLocal=()=>localStorage.setItem(storageKey,JSON.stringify(local));
   const nodeValid=n=>n&&typeof n.id==='string'&&typeof n.label==='string'&&colors[n.type];
+  const statusField=document.createElement('div');statusField.className='field';statusField.hidden=true;
+  statusField.innerHTML='<label for="new-status">Transition status (provisional)</label><select id="new-status"><option value="observed">Observed</option><option value="emerging" selected>Emerging</option><option value="anticipated">Anticipated</option></select>';
+  $('kind').closest('.field').after(statusField);
+  $('kind').addEventListener('change',()=>{statusField.hidden=$('kind').value!=='condition';});
+  const visibleGraph=()=>{
+    const nodes=data.nodes.filter(n=>{
+      if(visibility==='domains')return domainIds.has(n.id);
+      if(visibility==='transitions'&&!domainIds.has(n.id)&&n.type!=='condition')return false;
+      if(n.type==='condition'&&statusFilter!=='all'&&n.status!==statusFilter)return false;
+      return true;
+    });
+    const ids=new Set(nodes.map(n=>n.id));
+    return {nodes,edges:data.edges.filter(e=>ids.has(e.from)&&ids.has(e.to))};
+  };
 
   function populate(id) {
     const select=$(id),old=select.value;
     select.replaceChildren();
     data.nodes.forEach(n=>{const option=document.createElement('option');option.value=n.id;option.textContent=n.label;select.append(option);});
     if ([...select.options].some(o=>o.value===old)) select.value=old;
+    else if(id==='parent'&&inventory.length)select.value=inventory[0].id;
   }
   function refresh() {
     ['parent','source','target'].forEach(populate);
@@ -51,6 +72,7 @@
     const title=document.createElement('h3');title.textContent=n?n.label:'Explore a perspective';
     const detail=document.createElement('p');detail.textContent=n?(n.detail||'No description supplied.'):'Click any node in the network to inspect its description and connected ideas.';
     card.append(badge,title,detail);
+    if(n?.status){const status=document.createElement('p');status.textContent='Status: '+n.status.charAt(0).toUpperCase()+n.status.slice(1)+' (provisional)';card.append(status);}
     if(n){const related=document.createElement('p');related.textContent='Connected to: '+(data.edges.filter(e=>e.from===n.id||e.to===n.id).map(e=>nodeBy(e.from===n.id?e.to:e.from)?.label).filter(Boolean).join(', ')||'None yet');card.append(related);}
     $('restore').disabled=Boolean(shared);$('clear').disabled=Boolean(shared);
     draw();
@@ -70,12 +92,13 @@
   }
   function shape(tag,attrs={},text){const element=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))element.setAttribute(k,v);if(text!==undefined)element.textContent=text;return element;}
   function draw(){
+    const graph=visibleGraph();
     if(mode!=='organic'&&graphvizRenderer){
       svg.style.display='none';d3Renderer?.simulation.stop();graphvizRenderer.show();
-      graphvizRenderer.update(data,mode,selected);return;
+      graphvizRenderer.update(graph,mode,selected);return;
     }
     graphvizRenderer?.hide();svg.style.display='block';
-    if(d3Renderer){d3Renderer.update(data,'organic',selected);return;}
+    if(d3Renderer){d3Renderer.update(graph,'organic',selected);return;}
     const{w,h}=measure();svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.replaceChildren();
     data.edges.forEach(e=>{const a=positions[e.from],b=positions[e.to];if(a&&b)svg.append(shape('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:'edge'+(e.secondary?' secondary':'')}));});
     data.nodes.forEach(n=>{const p=positions[n.id];if(!p)return;const root=n.type==='transformation',r=root?35:24;
@@ -100,9 +123,9 @@
   function tick(){if(d3Renderer)return;layout();draw();requestAnimationFrame(tick);}
 
   const mergeRemote=remote=>{
-    const nodes=[...seed,...remote.nodes.filter(n=>nodeValid(n)&&!seed.some(s=>s.id===n.id))];
+    const nodes=[...fixedNodes,...remote.nodes.filter(n=>nodeValid(n)&&!fixedIds.has(n.id))];
     const ids=new Set(nodes.map(n=>n.id));
-    const edges=remote.edges.filter(e=>ids.has(e.from)&&ids.has(e.to));
+    const edges=[...initialEdges,...remote.edges.filter(e=>ids.has(e.from)&&ids.has(e.to)&&!initialEdges.some(s=>(s.from===e.from&&s.to===e.to)||(s.from===e.to&&s.to===e.from)))];
     data={nodes,edges};if(selected&&!ids.has(selected))selected=null;refresh();
   };
   async function join(){
@@ -125,11 +148,11 @@
     if(!['condition','implication','response'].includes(type))return alert('The six domains are fixed. Please select a contribution type.');
     const button=e.currentTarget.querySelector('button');button.disabled=true;
     try{
-      if(shared){const id=await shared.addNode({type,label,detail});
+      if(shared){const id=await shared.addNode({type,label,detail,status:type==='condition'?$('new-status').value:undefined});
         if(parent)await shared.addEdge(parent,id);
         showStatus('● Contribution added to '+session+'.');
       }else{
-        const id='n'+crypto.randomUUID();local.nodes.push({id,label,detail,type});
+        const id='n'+crypto.randomUUID();local.nodes.push({id,label,detail,type,status:type==='condition'?$('new-status').value:undefined});
         if(parent)local.edges.push({from:parent,to:id});selected=id;saveLocal();refresh();
       }
       $('label').value='';$('detail').value='';
@@ -143,6 +166,14 @@
   const modes=[['organic','Organic','Organic network'],['structured','Hierarchy','Hierarchical interpretation'],['radial','Radial','Radial interpretation'],['clustered','Clustered','Clustered interpretation']];
   const modeMap={organic:'organic',structured:'dot',radial:'twopi',clustered:'sfdp'};
   const toggle=document.querySelector('.toggle');
+  const statusLegend=document.createElement('div');statusLegend.className='status-legend';
+  statusLegend.innerHTML='<span><i class="status-symbol observed"></i>Observed</span><span><i class="status-symbol emerging"></i>Emerging</span><span><i class="status-symbol anticipated"></i>Anticipated</span><span class="status-note">Transition statuses are provisional</span>';
+  document.querySelector('.legend').after(statusLegend);
+  const filterBar=document.createElement('div');filterBar.className='network-filters';
+  filterBar.innerHTML='<label for="visibility-filter">Show</label><select id="visibility-filter" aria-label="Network visibility"><option value="domains" selected>Domains only</option><option value="transitions">Domains + Transitions</option><option value="all">Complete network</option></select><label for="status-filter">Transition status</label><select id="status-filter" aria-label="Filter transition status"><option value="all">All statuses</option><option value="observed">Observed</option><option value="emerging">Emerging</option><option value="anticipated">Anticipated</option></select>';
+  document.querySelector('.toolbar').after(filterBar);
+  $('visibility-filter').addEventListener('change',e=>{visibility=e.target.value;refresh();});
+  $('status-filter').addEventListener('change',e=>{statusFilter=e.target.value;refresh();});
   $('structured').textContent='Hierarchy';
   for(const id of ['radial','clustered']){
     const button=document.createElement('button');button.id=id;button.textContent=id==='radial'?'Radial':'Clustered';toggle.append(button);
@@ -161,9 +192,9 @@
   $('export-dot').onclick=()=>{const escape=s=>String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,' ');download('epistemic-transitions.dot',['digraph EpistemicTransitions {','  graph [overlap=false, splines=true];','  node [style=filled, fontname="Helvetica"];',...data.nodes.map(n=>`  "${escape(n.id)}" [label="${escape(n.label)}", fillcolor="${colors[n.type]}", fontcolor="white"];`),...data.edges.map(e=>`  "${escape(e.from)}" -> "${escape(e.to)}";`),'}'].join('\n'),'text/vnd.graphviz');};
   $('export-svg').onclick=()=>{const current=mode!=='organic'?graphvizRenderer?.getSVG():svg;if(!current)return alert('Please wait for the layout to finish.');const copy=current.cloneNode(true);copy.setAttribute('xmlns',NS);download('epistemic-transitions.svg',new XMLSerializer().serializeToString(copy),'image/svg+xml');};
   $('import-json').onclick=()=>shared?alert('Leave the shared session before importing a local graph.'):$('import-file').click();
-  $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const p=JSON.parse(await f.text());if(!Array.isArray(p.nodes)||!Array.isArray(p.edges)||!p.nodes.every(nodeValid))throw Error('Invalid graph format');local={nodes:[...seed,...p.nodes.filter(n=>!domainIds.has(n.id))],edges:p.edges};data=local;selected=null;positions={};saveLocal();refresh();}catch(err){alert(err.message);}e.target.value='';};
-  $('restore').onclick=()=>{if(shared)return;if(confirm('Restore the six fixed domains?')){local={nodes:[...seed],edges:[]};data=local;positions={};selected=null;saveLocal();refresh();}};
-  $('clear').onclick=()=>{if(shared)return;if(confirm('Remove all contributed nodes and connections?')){local={nodes:[...seed],edges:[]};data=local;positions={};selected=null;saveLocal();refresh();}};
+  $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const p=JSON.parse(await f.text());if(!Array.isArray(p.nodes)||!Array.isArray(p.edges)||!p.nodes.every(nodeValid))throw Error('Invalid graph format');local={nodes:[...fixedNodes,...p.nodes.filter(n=>!fixedIds.has(n.id))],edges:[...initialEdges,...p.edges]};data=local;selected=null;positions={};saveLocal();refresh();}catch(err){alert(err.message);}e.target.value='';};
+  $('restore').onclick=()=>{if(shared)return;if(confirm('Restore the six domains and initial transition inventory?')){local={nodes:[...fixedNodes],edges:[...initialEdges]};data=local;positions={};selected=null;saveLocal();refresh();}};
+  $('clear').onclick=()=>{if(shared)return;if(confirm('Remove all contributed nodes and connections? The fixed inventory will remain.')){local={nodes:[...fixedNodes],edges:[...initialEdges]};data=local;positions={};selected=null;saveLocal();refresh();}};
   window.addEventListener('resize',()=>positions={});
   initPositions();refresh();tick();
 })();
