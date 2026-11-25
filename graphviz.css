@@ -81,6 +81,11 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .graphviz-layer g.edge.focus-dim { opacity: .20; }
 .graphviz-layer g.edge.focus-linked path { stroke: #202020; stroke-width: 1.8px; }
 .graphviz-layer g.edge.focus-linked polygon { fill: #202020; stroke: #202020; }
+.graphviz-layer g.edge.response-link.focus-linked path { stroke: #c21870; }
+.graphviz-layer g.edge.response-link.focus-linked polygon { fill: #c21870; stroke: #c21870; }
+.graphviz-layer .reaction-marker text { font-weight: 400 !important; }
+.graphviz-layer .reaction-marker.reinforce text { fill: #fff !important; }
+.graphviz-layer .reaction-marker.question text { fill: #333 !important; }
 .graphviz-layer g.node.selected polygon,
 .graphviz-layer g.node.selected path,
 .graphviz-layer g.node.selected ellipse {
@@ -88,6 +93,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   stroke-width: 1.6px;
   stroke-opacity: 1;
 }
+.graphviz-layer g.node.response.selected ellipse { stroke: #c21870; }
 .graphviz-zoom-controls {
   position: absolute;
   right: 17px;
@@ -132,6 +138,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .canvas-wrap .legend { background: #fff; }
 .d3-viewport .node text { font-weight: 400; }
 .d3-viewport .node.idea text { fill: #202020; font-weight: 400; }
+.d3-viewport .node .reaction-marker.reinforcement text { fill: #fff !important; font-size: 10px; font-weight: 400; }
+.d3-viewport .node .reaction-marker.question text { fill: #333 !important; font-size: 11px; font-weight: 400; }
 .d3-viewport .node.root text { fill: #fff; font-weight: 400; }
 .d3-viewport .node,
 .d3-viewport .edge { transition: opacity .18s ease; }
@@ -139,12 +147,21 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .d3-viewport .edge.focus-dim { opacity: .20; }
 .d3-viewport .edge { stroke: #777; stroke-width: 1; opacity: .63; }
 .d3-viewport .edge.focus-linked { stroke: #202020; stroke-width: 1.8; opacity: 1; }
+.d3-viewport .edge.response-link,
+.d3-viewport .edge.response-link.focus-linked { stroke: #c21870; stroke-width: 1.8; opacity: .88; }
+.d3-viewport .node.idea:has(.main-circle) .reaction-marker { pointer-events: none; }
+.reaction-counts { margin-top: 15px; font-weight: 500; }
+.reaction-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.reaction-actions button { flex: 1 1 110px; }
+.node-card h4 { font-size: 12px; margin: 18px 0 7px; }
+.node-card .question-note { padding: 9px 12px; border-left: 2px solid #aaa; background: #fff; }
 .d3-viewport .node.selected .main-circle { stroke: #333; stroke-width: 2; }
+.d3-viewport .node.response.selected .main-circle { stroke: #c21870; }
 .d3-viewport .node.selected .inner-circle { stroke: none; }
 .canvas-wrap .legend span:nth-child(1) .dot { background: #202020 !important; }
 .canvas-wrap .legend span:nth-child(2) .dot { background: #fff !important; border: 1px solid #202020; }
 .canvas-wrap .legend span:nth-child(3) .dot { background: #fff !important; border: 1px dashed #202020; }
-.canvas-wrap .legend span:nth-child(4) .dot { background: #d1d1d1 !important; border: 1px solid #202020; }
+.canvas-wrap .legend span:nth-child(4) .dot { background: #fff !important; border: 2px solid #c21870; }
 @media(max-width:680px) {
   .graphviz-layer { padding: 8px; }
   .toolbar .toggle { flex-wrap: wrap; }
