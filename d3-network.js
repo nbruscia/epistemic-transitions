@@ -75,7 +75,7 @@
       this.selected=selected;
       this.applyFocus();
       const edgeKey=e=>`${e.id||''}:${e.from}:${e.to}`;
-      const signature=mode+'|'+data.nodes.map(n=>`${n.id}:${n.label}:${n.type}`).join('|')+'|'+data.edges.map(edgeKey).join('|');
+      const signature=mode+'|'+data.nodes.map(n=>`${n.id}:${n.label}:${n.type}:${n.status}`).join('|')+'|'+data.edges.map(edgeKey).join('|');
       if(signature===this.signature)return;
       const changedMode=this.mode!==mode;
       this.signature=signature;this.mode=mode;
@@ -119,13 +119,15 @@
       nodeSelection.select('.main-circle').attr('r',d=>d.type==='transformation'?42:20)
         .attr('fill',d=>palette[d.type]).attr('stroke','#202020')
         .attr('stroke-width',d=>d.type==='transformation'?1.4:1.3)
-        .attr('stroke-dasharray',d=>d.type==='implication'?'3 3':null);
-      nodeSelection.select('.inner-circle').attr('r',d=>d.type==='condition'?4:0)
-        .attr('fill','#202020');
+        .attr('stroke-dasharray',d=>d.type==='condition'&&d.status==='anticipated'?'4 3':d.type==='implication'?'3 3':null);
+      nodeSelection.select('.inner-circle')
+        .attr('r',d=>d.type==='condition'&&d.status==='observed'?16:0)
+        .attr('fill','none').attr('stroke','#202020')
+        .attr('stroke-width',1.3);
       nodeSelection.select('.node-label').each(function(d){
         const text=d3.select(this);text.selectAll('*').remove();
         if(d.type!=='transformation'){
-          text.attr('y',34).attr('fill','#202020').text(d.label.length>25?d.label.slice(0,24)+'…':d.label);return;
+          text.attr('y',34).attr('fill','#202020').text(d.label.length>29?d.label.slice(0,28)+'…':d.label);return;
         }
         text.attr('fill','#ffffff').text(null);
         const words=d.label.split(' '),lines=[];let current='';
