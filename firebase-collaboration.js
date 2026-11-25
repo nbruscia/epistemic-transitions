@@ -24,10 +24,11 @@ export async function connectWorkshop(workshopId, onData, onError) {
   const base = ['workshops', workshopId];
   const nodesRef = collection(db, ...base, 'nodes');
   const edgesRef = collection(db, ...base, 'edges');
-  let nodes = [], edges = [], nodesReady = false, edgesReady = false;
+  const interactionsRef = collection(db, ...base, 'interactions');
+  let nodes = [], edges = [], interactions = [], nodesReady = false, edgesReady = false;
   let resolveReady, rejectReady;
   const ready = new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject;});
-  const deliver = () => { if (nodesReady && edgesReady) {onData({nodes, edges});resolveReady();} };
+  const deliver = () => { if (nodesReady && edgesReady) {onData({nodes, edges, interactions});resolveReady();} };
   const failed = error => {onError(error);rejectReady(error);};
   const unsubs = [
     onSnapshot(nodesRef, snapshot => {
@@ -37,7 +38,12 @@ export async function connectWorkshop(workshopId, onData, onError) {
     onSnapshot(edgesRef, snapshot => {
       edges = snapshot.docs.map(d => ({id:d.id, ...d.data()}));
       edgesReady = true; deliver();
-    }, failed)
+    }, failed),
+    // This collection has its own narrowly scoped rules. An older project may
+    // deny access; keep the graph usable while the rules are being upgraded.
+    onSnapshot(interactionsRef, snapshot => {
+      interactions = snapshot.docs.map(d => ({id:d.id, ...d.data()}));deliver();
+    }, error => {onError(new Error('Faculty interactions unavailable: '+error.message));})
   ];
   try { await ready; } catch(error) { unsubs.forEach(fn=>fn()); throw error; }
   return {
@@ -58,6 +64,18 @@ export async function connectWorkshop(workshopId, onData, onError) {
     async addEdge(from, to) {
       const id = crypto.randomUUID();
       await setDoc(doc(edgesRef, id), {from, to, createdBy: uid, createdAt: serverTimestamp()});
+    },
+    async addInteraction(input) {
+      if(!['reinforce','question'].includes(input.kind))throw new Error('Unknown interaction type.');
+      const id=`${uid}-${input.kind}-${input.nodeId}`;
+      await setDoc(doc(interactionsRef,id),{
+        nodeId:input.nodeId,
+        kind:input.kind,
+        note:String(input.note||'').slice(0,1000),
+        createdBy:uid,
+        createdAt:serverTimestamp()
+      });
+      return id;
     },
     disconnect() { unsubs.forEach(fn => fn()); }
   };
