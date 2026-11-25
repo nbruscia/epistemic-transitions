@@ -3,7 +3,8 @@
 (function () {
   if (!window.d3) return;
   const d3 = window.d3;
-  const palette = {transformation:'#202020',condition:'#ffffff',implication:'#ffffff',response:'#d1d1d1'};
+  const palette = {transformation:'#202020',condition:'#ffffff',implication:'#ffffff',response:'#ffffff'};
+  const actionColor='#c21870';
 
   class EpistemicD3 {
     constructor(svgElement, onSelect) {
@@ -75,7 +76,7 @@
       this.selected=selected;
       this.applyFocus();
       const edgeKey=e=>`${e.id||''}:${e.from}:${e.to}`;
-      const signature=mode+'|'+data.nodes.map(n=>`${n.id}:${n.label}:${n.type}:${n.status}`).join('|')+'|'+data.edges.map(edgeKey).join('|');
+      const signature=mode+'|'+data.nodes.map(n=>`${n.id}:${n.label}:${n.type}:${n.status}:${n.reinforcements||0}:${n.questions||0}`).join('|')+'|'+data.edges.map(edgeKey).join('|');
       if(signature===this.signature)return;
       const changedMode=this.mode!==mode;
       this.signature=signature;this.mode=mode;
@@ -89,7 +90,8 @@
       const edges=data.edges.filter(e=>this.nodesById.has(e.from)&&this.nodesById.has(e.to)).map(e=>({id:edgeKey(e),source:e.from,target:e.to,secondary:!!e.secondary}));
       const edgeSelection=this.linksLayer.selectAll('line.edge').data(edges,d=>d.id)
         .join(enter=>enter.append('line').attr('class','edge'),update=>update,exit=>exit.remove())
-        .classed('secondary',d=>d.secondary);
+        .classed('secondary',d=>d.secondary)
+        .classed('response-link',d=>[d.source,d.target].some(endpoint=>this.nodesById.get(endpoint.id||endpoint)?.type==='response'));
       const nodeSelection=this.nodesLayer.selectAll('g.node').data(nodes,d=>d.id).join(
         enter=>{
           const g=enter.append('g').attr('class',d=>'node '+(d.type==='transformation'?'root':'idea'))
@@ -99,6 +101,11 @@
           g.append('circle').attr('class','main-circle');
           g.append('circle').attr('class','inner-circle');
           g.append('text').attr('class','node-label');
+          for(const kind of ['reinforcement','question']){
+            const marker=g.append('g').attr('class','reaction-marker '+kind).attr('pointer-events','none');
+            marker.append('circle').attr('r',9);
+            marker.append('text').attr('dy','3.5').attr('text-anchor','middle');
+          }
           g.call(d3.drag()
             .on('start',(event,d)=>{this.onSelect(d.id);if(!event.active)this.simulation.alphaTarget(.25).restart();d.fx=d.x;d.fy=d.y;})
             .on('drag',(event,d)=>{d.fx=event.x;d.fy=event.y;})
@@ -115,9 +122,10 @@
         .attr('aria-label',d=>d.label)
         .classed('selected',d=>d.id===selected)
         .classed('root',d=>d.type==='transformation')
-        .classed('idea',d=>d.type!=='transformation');
+        .classed('idea',d=>d.type!=='transformation')
+        .classed('response',d=>d.type==='response');
       nodeSelection.select('.main-circle').attr('r',d=>d.type==='transformation'?42:20)
-        .attr('fill',d=>palette[d.type]).attr('stroke','#202020')
+        .attr('fill',d=>palette[d.type]).attr('stroke',d=>d.type==='response'?actionColor:'#202020')
         .attr('stroke-width',d=>d.type==='transformation'?1.4:1.3)
         .attr('stroke-dasharray',d=>d.type==='condition'&&d.status==='anticipated'?'4 3':d.type==='implication'?'3 3':null);
       nodeSelection.select('.inner-circle')
@@ -135,6 +143,14 @@
         if(current)lines.push(current);
         lines.slice(0,3).forEach((line,i)=>text.append('tspan').attr('x',0).attr('y',(i-(Math.min(lines.length,3)-1)/2)*12+4).text(line));
       });
+      nodeSelection.select('.reaction-marker.reinforcement')
+        .attr('display',d=>d.reinforcements?'':'none')
+        .attr('transform',d=>`translate(${d.type==='transformation'?33:18},${d.type==='transformation'?-33:-18})`)
+        .each(function(d){const mark=d3.select(this);mark.select('circle').attr('fill','#202020');mark.select('text').attr('fill','#fff').text(d.reinforcements||'');});
+      nodeSelection.select('.reaction-marker.question')
+        .attr('display',d=>d.questions?'':'none')
+        .attr('transform',d=>`translate(${d.type==='transformation'?-33:-18},${d.type==='transformation'?-33:-18})`)
+        .each(function(d){const mark=d3.select(this);mark.select('circle').attr('fill','#eee').attr('stroke','#555');mark.select('text').attr('fill','#333').text('?');});
       this.edgeSelection=edgeSelection;this.nodeSelection=nodeSelection;
       this.simulation.nodes(nodes);
       this.simulation.force('link').links(edges);
