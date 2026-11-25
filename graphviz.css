@@ -33,7 +33,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .toolbar { background: #fff; border-bottom-color: #d9d9d9; }
 .legend { border-top-color: #dadada; }
 .metric, .node-card { background: #fff; border-color: #d6d6d6; }
-.node-card { background: #f4f4f4; }
+.node-card { background: #f7f7f7; border: 1px solid #dcdcdc; padding: 20px; }
 .node-card p { color: #545454; }
 .pill { color: #202020; background: #e0e0e0; }
 .rule { border-top-color: #dadada; }
@@ -78,10 +78,24 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .graphviz-layer g.node.selected polygon,
 .graphviz-layer g.node.selected path,
 .graphviz-layer g.node.selected ellipse {
-  stroke: #000;
-  stroke-width: 3px;
+  stroke: #333;
+  stroke-width: 1.6px;
   stroke-opacity: 1;
 }
+.graphviz-zoom-controls {
+  position: absolute;
+  right: 17px;
+  bottom: 16px;
+  z-index: 3;
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  background: #fffffff0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+.graphviz-zoom-controls[hidden] { display: none; }
+.graphviz-zoom-controls button { min-width: 30px; padding: 5px 9px; font-size: 14px; }
 .network-filters {
   display: flex;
   align-items: center;
@@ -119,7 +133,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .d3-viewport .edge.focus-dim { opacity: .20; }
 .d3-viewport .edge { stroke: #777; stroke-width: 1; opacity: .63; }
 .d3-viewport .edge.focus-linked { stroke: #202020; stroke-width: 1.8; opacity: 1; }
-.d3-viewport .node.selected .main-circle { stroke: #000; stroke-width: 3.5; }
+.d3-viewport .node.selected .main-circle { stroke: #333; stroke-width: 2; }
 .d3-viewport .node.selected .inner-circle { stroke: none; }
 .canvas-wrap .legend span:nth-child(1) .dot { background: #202020 !important; }
 .canvas-wrap .legend span:nth-child(2) .dot { background: #fff !important; border: 1px solid #202020; }
