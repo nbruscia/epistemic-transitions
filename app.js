@@ -163,8 +163,8 @@
     if(data.edges.some(e=>(e.from===from&&e.to===to)||(e.from===to&&e.to===from)))return alert('These nodes are already connected.');
     try{if(shared)await shared.addEdge(from,to);else{local.edges.push({from,to,secondary:true});saveLocal();refresh();}}catch(err){alert('Connection was not saved: '+err.message);}
   });
-  const modes=[['organic','Organic','Organic network'],['structured','Hierarchy','Hierarchical interpretation'],['radial','Radial','Radial interpretation'],['clustered','Clustered','Clustered interpretation']];
-  const modeMap={organic:'organic',structured:'dot',radial:'twopi',clustered:'sfdp'};
+  const modes=[['organic','Organic','Organic network'],['structured','Hierarchy','Hierarchical interpretation'],['clustered','Clustered','Clustered interpretation']];
+  const modeMap={organic:'organic',structured:'dot',clustered:'sfdp'};
   const toggle=document.querySelector('.toggle');
   const statusLegend=document.createElement('div');statusLegend.className='status-legend';
   statusLegend.innerHTML='<span><i class="status-symbol observed"></i>Observed</span><span><i class="status-symbol emerging"></i>Emerging</span><span><i class="status-symbol anticipated"></i>Anticipated</span><span class="status-note">Transition statuses are provisional</span>';
@@ -175,14 +175,20 @@
   $('visibility-filter').addEventListener('change',e=>{visibility=e.target.value;refresh();});
   $('status-filter').addEventListener('change',e=>{statusFilter=e.target.value;refresh();});
   $('structured').textContent='Hierarchy';
-  for(const id of ['radial','clustered']){
-    const button=document.createElement('button');button.id=id;button.textContent=id==='radial'?'Radial':'Clustered';toggle.append(button);
-  }
+  const clusteredButton=document.createElement('button');clusteredButton.id='clustered';clusteredButton.textContent='Clustered';toggle.append(clusteredButton);
+  const graphZoom=document.createElement('div');graphZoom.className='graphviz-zoom-controls';graphZoom.hidden=true;
+  graphZoom.innerHTML='<button type="button" class="secondary" aria-label="Zoom in" title="Zoom in">+</button><button type="button" class="secondary" aria-label="Zoom out" title="Zoom out">−</button><button type="button" class="secondary" aria-label="Fit graph" title="Reset zoom">Fit</button>';
+  document.querySelector('.graph-area').append(graphZoom);
+  const zoomButtons=graphZoom.querySelectorAll('button');
+  zoomButtons[0].addEventListener('click',()=>graphvizRenderer?.zoomBy(1.3));
+  zoomButtons[1].addEventListener('click',()=>graphvizRenderer?.zoomBy(1/1.3));
+  zoomButtons[2].addEventListener('click',()=>graphvizRenderer?.resetZoom());
   for(const[id,,title]of modes)$(id).addEventListener('click',()=>{
     const next=modeMap[id];const wasOrganic=mode==='organic';mode=next;
     for(const[button]of modes)$(button).classList.toggle('active',button===id);
     $('view-title').textContent=title;
     $('reset-view').style.display=next==='organic'?'':'none';
+    graphZoom.hidden=next==='organic';
     if(next==='organic'&&!wasOrganic)d3Renderer?.simulation.alpha(.35).restart();
     refresh();
   });
