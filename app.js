@@ -1,13 +1,17 @@
 (() => {
   'use strict';
   const seed = [
-    ['t1','Knowledge & Expertise','Changing relationships between human intelligence, computation, and design expertise.'],
-    ['t2','Resources & Ecology','Reconsidering material, energy, and ecological relationships.'],
-    ['t3','Labor & Production','Changing forms of work, craft, manufacturing, and construction.'],
-    ['t4','Habitation & Society','Changing populations, housing needs, and social relationships.'],
-    ['t5','Culture & Identity','Continuity and transformation of cultural knowledge and practices.'],
-    ['t6','Agency & Practice','Expanding responsibilities, expertise, and civic agency.']
+    ['t1','Knowledge & Expertise','Architectural knowledge, methods of inquiry, design reasoning, representation, and the expertise required to conceive and evaluate the built environment.'],
+    ['t2','Resources & Ecology',"Architecture's relationships with materials, energy, land, ecological systems, and the environmental consequences of building."],
+    ['t3','Labor & Production','The human skills, technologies, organizations, and processes through which buildings are designed, manufactured, constructed, and maintained.'],
+    ['t4','Habitation & Society',"The spatial organization of human habitation, including housing, accessibility, collective life, and architecture's relationship to social needs."],
+    ['t5','Culture & Identity','Architecture as an expression and transmission of cultural knowledge, memory, identity, and situated building traditions.'],
+    ['t6','Agency & Practice','The professional, institutional, political, and ethical responsibilities through which architects participate in shaping the built environment.']
   ].map(([id,label,detail])=>({id,label,detail,type:'transformation'}));
+  // Retain the historical internal type for compatibility with existing workshop
+  // exports and Firebase records. Only these six IDs are fixed domains.
+  const domainIds=new Set(seed.map(n=>n.id));
+  const displayType=n=>n&&domainIds.has(n.id)?'Domain':n?.type==='transformation'?'Legacy transformation':({condition:'Changing condition',implication:'Educational implication',response:'Proposed response'}[n?.type]||'');
   const colors = {transformation:'#466c79', condition:'#b9874b', implication:'#8188a8', response:'#528d73'};
   const $ = id => document.getElementById(id);
   const svg = $('graph'), NS='http://www.w3.org/2000/svg';
@@ -15,6 +19,7 @@
   let local;
   try { local=JSON.parse(localStorage.getItem(storageKey)); } catch {}
   if (!local || !Array.isArray(local.nodes) || !Array.isArray(local.edges)) local={nodes:[...seed],edges:[]};
+  local.nodes=[...seed,...local.nodes.filter(n=>!domainIds.has(n.id))];
   let data=local, mode='organic', selected=null, positions={}, dragging=null, shared=null, session='';
   const d3Renderer=window.EpistemicD3?new window.EpistemicD3(svg,id=>{selected=id;refresh();}):null;
   const status=document.querySelector('header .status');
@@ -42,7 +47,7 @@
     $('count-links').textContent=data.edges.length;
     const card=$('selected-card');card.replaceChildren();
     const n=nodeBy(selected);
-    const badge=document.createElement('span');badge.className='pill';badge.textContent=n?n.type:'Select a node';
+    const badge=document.createElement('span');badge.className='pill';badge.textContent=n?displayType(n):'Select a node';
     const title=document.createElement('h3');title.textContent=n?n.label:'Explore a perspective';
     const detail=document.createElement('p');detail.textContent=n?(n.detail||'No description supplied.'):'Click any node in the network to inspect its description and connected ideas.';
     card.append(badge,title,detail);
@@ -109,14 +114,16 @@
       const {connectWorkshop}=await import('./firebase-collaboration.js');
       const connection=await connectWorkshop(id,mergeRemote,err=>showStatus('Firestore: '+err.message,true));
       shared=connection;session=id;sessionButton.textContent='Leave shared session';showStatus('● Shared session: '+id);
-      $('timeline').textContent='Shared session '+id+'. Contributions synchronize between connected browsers. Existing entries are immutable; export the graph for a record.';
+      $('timeline').textContent='Shared session '+id+'. The six domains are fixed; contributions and connections synchronize between browsers. Existing entries are immutable; export the graph for a record.';
     }catch(err){showStatus('Connection failed: '+err.message,true);alert('Could not join the shared session: '+err.message+'\n\nPlease check the Firestore rules and Firebase configuration.');}
     finally{sessionButton.disabled=false;refresh();}
   }
   sessionButton.addEventListener('click',join);
   $('idea-form').addEventListener('submit',async e=>{
     e.preventDefault();const type=$('kind').value,label=$('label').value.trim(),detail=$('detail').value.trim(),parent=$('parent').value;
-    if(!label)return;const button=e.currentTarget.querySelector('button');button.disabled=true;
+    if(!label)return;
+    if(!['condition','implication','response'].includes(type))return alert('The six domains are fixed. Please select a contribution type.');
+    const button=e.currentTarget.querySelector('button');button.disabled=true;
     try{
       if(shared){const id=await shared.addNode({type,label,detail});
         if(parent)await shared.addEdge(parent,id);
@@ -154,9 +161,9 @@
   $('export-dot').onclick=()=>{const escape=s=>String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,' ');download('epistemic-transitions.dot',['digraph EpistemicTransitions {','  graph [overlap=false, splines=true];','  node [style=filled, fontname="Helvetica"];',...data.nodes.map(n=>`  "${escape(n.id)}" [label="${escape(n.label)}", fillcolor="${colors[n.type]}", fontcolor="white"];`),...data.edges.map(e=>`  "${escape(e.from)}" -> "${escape(e.to)}";`),'}'].join('\n'),'text/vnd.graphviz');};
   $('export-svg').onclick=()=>{const current=mode!=='organic'?graphvizRenderer?.getSVG():svg;if(!current)return alert('Please wait for the layout to finish.');const copy=current.cloneNode(true);copy.setAttribute('xmlns',NS);download('epistemic-transitions.svg',new XMLSerializer().serializeToString(copy),'image/svg+xml');};
   $('import-json').onclick=()=>shared?alert('Leave the shared session before importing a local graph.'):$('import-file').click();
-  $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const p=JSON.parse(await f.text());if(!Array.isArray(p.nodes)||!Array.isArray(p.edges)||!p.nodes.every(nodeValid))throw Error('Invalid graph format');local=p;data=local;selected=null;positions={};saveLocal();refresh();}catch(err){alert(err.message);}e.target.value='';};
-  $('restore').onclick=()=>{if(shared)return;if(confirm('Restore the original six transformations?')){local={nodes:[...seed],edges:[]};data=local;positions={};selected=null;saveLocal();refresh();}};
-  $('clear').onclick=()=>{if(shared)return;if(confirm('Remove all contributed nodes and connections?')){local={nodes:local.nodes.filter(n=>n.type==='transformation'),edges:[]};data=local;positions={};selected=null;saveLocal();refresh();}};
+  $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const p=JSON.parse(await f.text());if(!Array.isArray(p.nodes)||!Array.isArray(p.edges)||!p.nodes.every(nodeValid))throw Error('Invalid graph format');local={nodes:[...seed,...p.nodes.filter(n=>!domainIds.has(n.id))],edges:p.edges};data=local;selected=null;positions={};saveLocal();refresh();}catch(err){alert(err.message);}e.target.value='';};
+  $('restore').onclick=()=>{if(shared)return;if(confirm('Restore the six fixed domains?')){local={nodes:[...seed],edges:[]};data=local;positions={};selected=null;saveLocal();refresh();}};
+  $('clear').onclick=()=>{if(shared)return;if(confirm('Remove all contributed nodes and connections?')){local={nodes:[...seed],edges:[]};data=local;positions={};selected=null;saveLocal();refresh();}};
   window.addEventListener('resize',()=>positions={});
   initPositions();refresh();tick();
 })();
